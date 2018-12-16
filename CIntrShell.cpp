@@ -16,15 +16,6 @@ CIntrShell::CIntrShell(char* par_cpExecutableName)
 }
 */
 
-long long int CIntrShell::CallFunction(char* par_cpFuncName)
-{
-	void* vpFuncAddress = getFuncAddressByName(par_cpFuncName);
-	void(*f)();
-	f = (void(*)())vpFuncAddress;
-	f();
-}
-
-
 
 void* CIntrShell::getFuncAddressByName(char* par_cpFuncName)
 {
@@ -230,6 +221,8 @@ bool CIntrShell::ParseNumericArgument(char** par_cppShellCommand, long long int*
 
 long long int CIntrShell::CallFunctionWithArgs(char* par_cpInput)
 {
+	if(par_cpInput == NULL || *par_cpInput == 0)
+		return 0;
 	char cpFunctionName[MAX_FUNCNAME_LENGTH];
 	char cpStringLiterals[MAX_STRINGARG_LENGTH];
 	long long int llnpNumericArgs[MAX_ARG_COUNT];
@@ -254,4 +247,43 @@ long long int CIntrShell::CallFunctionWithArgs(char* par_cpInput)
 			cpPrintIndex += strlen(cpPrintIndex) + 1;
 		}
 	}
+
+	//place all arguments in llnpNumericArgs array
+	cpPrintIndex = cpStringLiterals;
+	for (int nInd = 0; nInd < MAX_ARG_COUNT; nInd++)
+	{
+		if(nInd < nNumberOfArgs)
+		{
+			if(epArgumentTypes[nInd] == ARG_NUMBER)	//numbers are already in the array
+				continue;
+			else if(epArgumentTypes[nInd] == ARG_STRING)
+			{
+				llnpNumericArgs[nInd] = (long long int)cpPrintIndex;
+				cpPrintIndex += strlen(cpPrintIndex) + 1;
+			}
+		}
+		else
+		{
+			llnpNumericArgs[nInd] = 0;
+		}
+	}
+
+	void* vpFunctionAddress = getFuncAddressByName(cpFunctionName);
+
+	long long int(*funcpFunctionToCall)(...);	//declare a func pointer taking a variable num of inputs and returning a long long int
+	funcpFunctionToCall = (long long int(*)(...))vpFunctionAddress;	//cast the function address into its type
+	long long int llnRetVal = 0;
+	llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
+						llnpNumericArgs[1],
+						llnpNumericArgs[2],
+						llnpNumericArgs[3],
+						llnpNumericArgs[4],
+						llnpNumericArgs[5],
+						llnpNumericArgs[6],
+						llnpNumericArgs[7],
+						llnpNumericArgs[8],
+						llnpNumericArgs[9]); 
+
+	return llnRetVal;
 }

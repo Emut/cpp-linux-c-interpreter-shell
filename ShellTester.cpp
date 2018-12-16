@@ -4,16 +4,18 @@
 int main(int argc, char** argv)
 {
 	char cpBuffer[200];
-	char cpBuffer2[200];
-	//CIntrShell::getProgramName(cpBuffer);
-	//printf("From outside:%s\n", cpBuffer);
-	//CIntrShell TestInstance("Test");
-	//CIntrShell::CallFunction("HiddenFunc");
-	//CIntrShell::CallFunction("HiddenFunc");
-	//CIntrShell::CallFunction("HiddenFunc");
 
-	CIntrShell::CallFunctionWithArgs("HiMomma(\"asd\", 1, 123, \"kediler\", 58, \"\")");
-	CIntrShell::CallFunctionWithArgs("Ceran  8 ,9");
-	CIntrShell::CallFunctionWithArgs("Ayidolf");
+	while(true)
+	{
+		printf("->");	//shell prompt
+		gets(cpBuffer);	//yea, i know the gets is evil but can we roll with it for once?
+		if(*cpBuffer != 0)	//if user input is not empty
+		{
+			long long int llnRetVal = CIntrShell::CallFunctionWithArgs(cpBuffer);
+			printf("Call Returned:%lld\n", llnRetVal);
+		}
+	}
+
+
 	
 }
