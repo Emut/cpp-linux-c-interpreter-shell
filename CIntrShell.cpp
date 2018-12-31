@@ -8,6 +8,7 @@
 #define MAX_ARG_COUNT 10	//maximum number of args shell command can have
 #define MAX_PROGNAME_LENGTH 100 	//max length of the executable's name
 #define MAX_FUNCNAME_LENGTH 100		//max length of function name
+#define MAX_SHELL_LINE_LENGTH 500	//used by getFuncAddressByName
 #define MAX_STRINGARG_LENGTH 1000	//max length of all string arguments combined
 /*	//Constructor is not needed at the moment
 CIntrShell::CIntrShell(char* par_cpExecutableName)
@@ -15,9 +16,9 @@ CIntrShell::CIntrShell(char* par_cpExecutableName)
 	sprintf(cpExecutableName, "%s", par_cpExecutableName);
 }
 */
+bool CIntrShell::bSilentMode = false;
 
-
-void* CIntrShell::getFuncAddressByName(char* par_cpFuncName)
+void* CIntrShell::getFuncAddressByName(char* par_cpFuncName, int* par_npStatus)
 {
 	static char cpProgramName[MAX_PROGNAME_LENGTH];
 	static bool bFirstRun = true;
@@ -27,15 +28,53 @@ void* CIntrShell::getFuncAddressByName(char* par_cpFuncName)
 		bFirstRun = false;
 	}
 
-	char cpCommand[200];
+	char cpCommand[MAX_FUNCNAME_LENGTH + 50];
 	sprintf(cpCommand, "nm %s -C| grep %s", cpProgramName, par_cpFuncName);
 	
-	char cpOutputBuffer[2000];
-	ShellIO(cpCommand, cpOutputBuffer, 2000);
-
+	char cpOutputBuffer[MAX_SHELL_LINE_LENGTH];
+	bool bSingleAlternative = false;
 	long long int llnFuncAddress = 0;
-	sscanf(cpOutputBuffer, "%llx", &llnFuncAddress);
-	printf("Function %s is at 0x%llx\n", par_cpFuncName, llnFuncAddress);
+	while(true)
+	{
+		int nRetVal = ShellIO_Line(cpCommand, cpOutputBuffer, MAX_SHELL_LINE_LENGTH);
+		if(nRetVal < 0)
+			break;	//nRetVal < 0 means error in shellIO
+		char* cpOpenParen = strchr(cpOutputBuffer, '(');
+		if(cpOpenParen == NULL)
+			if(nRetVal == 0)
+				break;
+			else
+				continue;	//line does not include a function
+		int nFuncNameLength = strlen(par_cpFuncName);
+		if(cpOpenParen - cpOutputBuffer >= nFuncNameLength)
+		{
+			cpOpenParen -= nFuncNameLength;
+			if(strstr(cpOpenParen, par_cpFuncName) == cpOpenParen)
+			{
+				if(!bSingleAlternative)
+				{
+					sscanf(cpOutputBuffer, "%llx", &llnFuncAddress);
+					bSingleAlternative = true;
+				}
+				else
+				{
+					if(par_npStatus != NULL)
+						*par_npStatus = 2;
+					break;	//there are more than one alternatives
+				}
+			}
+		}
+		if(nRetVal == 0)
+			break;
+	}
+	if(par_npStatus != NULL)
+		if(*par_npStatus != 2)
+			if(llnFuncAddress == 0)
+				*par_npStatus = 1;
+			else
+				*par_npStatus = 0;
+	ShellIO_Line(NULL, NULL, -1);	//close and reset ShellIO
+	//printf("Function %s is at 0x%llx\n", par_cpFuncName, llnFuncAddress);
 	return (void*)llnFuncAddress;
 }
 
@@ -57,6 +96,62 @@ int CIntrShell::ShellIO(char* par_cpInput, char* par_cpOutput, int par_nMaxOutpu
 	return nRetVal;
 }
 
+int CIntrShell::ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength)
+{
+	static bool bIsStreamOpen = false;
+	static FILE* filepShell = 0;
+	if(par_nMaxOutputLength < 1)	//close signal
+	{
+		if(bIsStreamOpen)
+		{
+			pclose(filepShell);
+			bIsStreamOpen = false;
+		}
+		return 0;
+	}
+	if(!bIsStreamOpen)
+	{
+
+		filepShell = popen(par_cpInput, "r");
+		if(filepShell == NULL)
+		{
+			printf("CIntrShell::ShellIO:Error running shell cmd\n");
+			return -1;
+		}
+		bIsStreamOpen = true;
+	}
+
+	int nCharCount = 0;
+	while(true)
+	{
+		char cRead = getc(filepShell);
+		if(cRead == EOF)
+		{
+			//printf("EOF\n");
+			par_cpOutput[nCharCount] = 0;
+			pclose(filepShell);
+			bIsStreamOpen = false;
+			return 0;	//return 0 if no more lines
+		}
+		if(cRead == '\n')	//if end of line
+		{
+			par_cpOutput[nCharCount] = 0;
+			cRead = getc(filepShell);	//check if next char is EOF
+			if(cRead == EOF)
+			{
+				//printf("EOFFF\n");
+				pclose(filepShell);
+				bIsStreamOpen = false;
+				return 0;	//return 0 if no more lines
+			}
+			//printf("EOL\n");
+			fseek(filepShell, -1, SEEK_CUR);	//if next char is not EOF, rewind the stream by one char
+			return 1;	//return 1 if there are more lines
+		}
+		par_cpOutput[nCharCount++] = cRead;
+	}
+}
+
 bool CIntrShell::getProgramName(char* par_cpProgramName)
 {
 	char cpPath[PATH_MAX];
@@ -72,7 +167,6 @@ bool CIntrShell::getProgramName(char* par_cpProgramName)
 		printf("CIntrShell::getProgramName:Can not get the program name!\n");
 		return false;
 	}
-	printf("ProgramName:%s\n", par_cpProgramName);
 	return true;
 }
 
@@ -177,7 +271,7 @@ bool CIntrShell::ParseStringArgument(char** par_cppShellCommand, char* par_cpStr
 		{
 			*par_cppShellCommand = ++cpParseIndex;	//move passed ParseIndex to one past end '"'
 			*cpCopyIndex = 0;
-			(*par_npStringBufferOffset)++;	//add terminator
+			(*par_npStringBufferOffset)++;	//add terminator and move forward
 			return true;
 		}
 		*cpCopyIndex++ = *cpParseIndex++;	//copy and move both
@@ -219,7 +313,7 @@ bool CIntrShell::ParseNumericArgument(char** par_cppShellCommand, long long int*
 	}
 }
 
-long long int CIntrShell::CallFunctionWithArgs(char* par_cpInput)
+long long int CIntrShell::CallFunctionWithArgs(char* par_cpInput, int* par_npStatus)
 {
 	if(par_cpInput == NULL || *par_cpInput == 0)
 		return 0;
@@ -229,11 +323,14 @@ long long int CIntrShell::CallFunctionWithArgs(char* par_cpInput)
 	teArgumentType epArgumentTypes[MAX_ARG_COUNT];
 
 	int nNumberOfArgs = ParseShellCommand(par_cpInput, cpFunctionName, cpStringLiterals, llnpNumericArgs, epArgumentTypes);
+
+	char* cpPrintIndex = cpStringLiterals;
+
+	#if ENABLE_DEBUG_PRINTS
 	printf("Input:%s\n", par_cpInput);
 	printf("FuncName:%s\n", cpFunctionName);
 	printf("Number of Args:%d\n", nNumberOfArgs);
 
-	char* cpPrintIndex = cpStringLiterals;
 	for(int nInd = 0; nInd < nNumberOfArgs; nInd++)
 	{
 		printf("Arg%d::", nInd);
@@ -247,7 +344,7 @@ long long int CIntrShell::CallFunctionWithArgs(char* par_cpInput)
 			cpPrintIndex += strlen(cpPrintIndex) + 1;
 		}
 	}
-
+	#endif
 	//place all arguments in llnpNumericArgs array
 	cpPrintIndex = cpStringLiterals;
 	for (int nInd = 0; nInd < MAX_ARG_COUNT; nInd++)
@@ -268,7 +365,9 @@ long long int CIntrShell::CallFunctionWithArgs(char* par_cpInput)
 		}
 	}
 
-	void* vpFunctionAddress = getFuncAddressByName(cpFunctionName);
+	void* vpFunctionAddress = getFuncAddressByName(cpFunctionName, par_npStatus);
+	if(vpFunctionAddress == NULL)
+		return 0;
 
 	long long int(*funcpFunctionToCall)(...);	//declare a func pointer taking a variable num of inputs and returning a long long int
 	funcpFunctionToCall = (long long int(*)(...))vpFunctionAddress;	//cast the function address into its type
@@ -284,6 +383,7 @@ long long int CIntrShell::CallFunctionWithArgs(char* par_cpInput)
 						llnpNumericArgs[7],
 						llnpNumericArgs[8],
 						llnpNumericArgs[9]); 
-
+	if(!CIntrShell::bSilentMode)
+		printf("Returned:%lld\n", llnRetVal);
 	return llnRetVal;
 }
