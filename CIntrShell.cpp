@@ -29,7 +29,7 @@ void* CIntrShell::getFuncAddressByName(char* par_cpFuncName, int* par_npStatus)
 	}
 
 	char cpCommand[MAX_FUNCNAME_LENGTH + 50];
-	sprintf(cpCommand, "nm %s -C| grep %s", cpProgramName, par_cpFuncName);
+	sprintf(cpCommand, "nm %s -C| grep [:+[:space:]]%s\\(", cpProgramName, par_cpFuncName);
 	
 	char cpOutputBuffer[MAX_SHELL_LINE_LENGTH];
 	bool bSingleAlternative = false;
@@ -247,7 +247,7 @@ bool CIntrShell::ParseFuncName(char** par_cppShellCommand, char* par_cpFuncName)
 		}
 		else
 		{
-			printf("CIntrShell::ParseFuncName:Unexpecdted char value");
+			printf("CIntrShell::ParseFuncName:Unexpecdted char value\n %d", *cpParseIndex);
 			return false;
 		}
 	}
@@ -288,7 +288,6 @@ bool CIntrShell::ParseNumericArgument(char** par_cppShellCommand, long long int*
 	{
 		if(*cpParseIndex >= '0' && *cpParseIndex <= '9')	//if a number
 		{
-			//printf("%s ", cpParseIndex);
 			*par_llnpResult *= 10;
 			*par_llnpResult += *cpParseIndex++ - 48; //asciinumber-48=number
 		}
@@ -297,19 +296,6 @@ bool CIntrShell::ParseNumericArgument(char** par_cppShellCommand, long long int*
 			*par_cppShellCommand = cpParseIndex; 
 			return true;
 		}
-		/*
-		if(*cpParseIndex == 0 || *cpParseIndex == ' ' || *cpParseIndex == ',')	//if string ended or space or comma, means end of number 
-		{
-			*par_cppShellCommand = cpParseIndex; 
-			return true;
-		}
-		
-		else	//non-number in number input
-		{
-			printf("CIntrShell::ParseNumericArgument:Invalid syntax\n");
-			return false;
-		}
-		*/
 	}
 }
 

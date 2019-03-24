@@ -1,7 +1,7 @@
 # cpp-linux-c-interpreter-shell
 Umut Ekici - 2018
 
-UNDER CONSTRUCTION - First version gonna be here before 2019!
+UNDER CONSTRUCTION
 
 Inspired by the vxworks c interpreter shell. 
 
@@ -17,6 +17,8 @@ TODO:
 
 -A way to output the case where call was unsuccessful
 
-KNOWN ISSUES:
+-Variables!
 
--Function name matching only checks starting from right. (e.g.: if a function named 'MyBestFunc' exist, a search for 'BestFunc' will match to it)
+-Object management
+
+-Get more input types: char decimal hex etc.

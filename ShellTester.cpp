@@ -1,5 +1,6 @@
 #include "CIntrShell.h"
 #include <stdio.h>
+#include <string.h>
 
 int main(int argc, char** argv)
 {
@@ -10,7 +11,8 @@ int main(int argc, char** argv)
 	while(true)
 	{
 		printf("->");	//shell prompt
-		gets(cpBuffer);	//yea, i know the gets is evil but can we roll with it for once?
+		fgets(cpBuffer, 2000, stdin);	
+		*strchr(cpBuffer, '\n') = 0;	//remove the newline at the end.
 		if(*cpBuffer != 0)	//if user input is not empty
 		{
 			long long int llnRetVal = CIntrShell::CallFunctionWithArgs(cpBuffer, &nStatus);

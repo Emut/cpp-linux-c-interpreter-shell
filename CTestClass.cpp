@@ -12,3 +12,8 @@ int StringInputTester(char* par_cpString)
 	printf("String input:%s\n", par_cpString);
 	return strlen(par_cpString);
 }
+
+int DoubleInput(char* par_cpString, int par_nNumber)
+{
+	printf("String:%s Number:%d\n", par_cpString, par_nNumber);
+}
