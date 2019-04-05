@@ -358,7 +358,11 @@ long long int CIntrShell::CallFunctionWithArgs(char* par_cpInput, int* par_npSta
 	long long int(*funcpFunctionToCall)(...);	//declare a func pointer taking a variable num of inputs and returning a long long int
 	funcpFunctionToCall = (long long int(*)(...))vpFunctionAddress;	//cast the function address into its type
 	long long int llnRetVal = 0;
-	llnRetVal = funcpFunctionToCall(
+
+	switch (nNumberOfArgs)
+	{
+		case 0:
+			llnRetVal = funcpFunctionToCall(
 						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
 						llnpNumericArgs[1],
 						llnpNumericArgs[2],
@@ -368,7 +372,98 @@ long long int CIntrShell::CallFunctionWithArgs(char* par_cpInput, int* par_npSta
 						llnpNumericArgs[6],
 						llnpNumericArgs[7],
 						llnpNumericArgs[8],
-						llnpNumericArgs[9]); 
+						llnpNumericArgs[9]);
+			break;
+		case 1:
+			llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0]);
+			break;
+		case 2:
+			llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
+						llnpNumericArgs[1]);
+			break;
+		case 3:
+			llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
+						llnpNumericArgs[1],
+						llnpNumericArgs[2]);
+			break;
+		case 4:
+			llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
+						llnpNumericArgs[1],
+						llnpNumericArgs[2],
+						llnpNumericArgs[3]);
+			break;
+		case 5:
+			llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
+						llnpNumericArgs[1],
+						llnpNumericArgs[2],
+						llnpNumericArgs[3],
+						llnpNumericArgs[4]);
+			break;
+		case 6:
+			llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
+						llnpNumericArgs[1],
+						llnpNumericArgs[2],
+						llnpNumericArgs[3],
+						llnpNumericArgs[4],
+						llnpNumericArgs[5]);
+			break;
+		case 7:
+			llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
+						llnpNumericArgs[1],
+						llnpNumericArgs[2],
+						llnpNumericArgs[3],
+						llnpNumericArgs[4],
+						llnpNumericArgs[5],
+						llnpNumericArgs[6]);
+			break;
+		case 8:
+			llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
+						llnpNumericArgs[1],
+						llnpNumericArgs[2],
+						llnpNumericArgs[3],
+						llnpNumericArgs[4],
+						llnpNumericArgs[5],
+						llnpNumericArgs[6],
+						llnpNumericArgs[7]);
+			break;
+		case 9:
+			llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
+						llnpNumericArgs[1],
+						llnpNumericArgs[2],
+						llnpNumericArgs[3],
+						llnpNumericArgs[4],
+						llnpNumericArgs[5],
+						llnpNumericArgs[6],
+						llnpNumericArgs[7],
+						llnpNumericArgs[8]);
+			break;
+		case 10:
+			llnRetVal = funcpFunctionToCall(
+						llnpNumericArgs[0],		//this is not nice. Need to find a way to call a variadic func with variable number of args in runtime
+						llnpNumericArgs[1],
+						llnpNumericArgs[2],
+						llnpNumericArgs[3],
+						llnpNumericArgs[4],
+						llnpNumericArgs[5],
+						llnpNumericArgs[6],
+						llnpNumericArgs[7],
+						llnpNumericArgs[8],
+						llnpNumericArgs[9]);
+			break;
+	
+		default:
+			break;
+	}
+ 
 	if(!CIntrShell::bSilentMode)
 		printf("Returned:%lld\n", llnRetVal);
 	return llnRetVal;
