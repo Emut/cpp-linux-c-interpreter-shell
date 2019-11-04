@@ -31,6 +31,11 @@ void PrintValue(int* par_npNumber)
 	printf("Number:%d\n", *par_npNumber);
 }
 
+void PrintValue(int par_nNumber)
+{
+	printf("Number:%d\n", par_nNumber);
+}
+
 void BoolAndInteger(bool par_bTest, int par_nTest)
 {
 	printf("Bool:%s Integer:%d\n", par_bTest?"true":"false", par_nTest);
