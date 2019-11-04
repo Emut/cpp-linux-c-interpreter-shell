@@ -7,6 +7,10 @@ void CTestClass::HiddenFunction()
 	printf("You Have Found Me!\n");
 }
 
+void HiddenFunction(){
+	printf("You Have Found Me Out Of Scope!\n");
+}
+
 int StringInputTester(char* par_cpString)
 {
 	printf("String input:%s\n", par_cpString);
@@ -34,6 +38,22 @@ void PrintValue(int* par_npNumber)
 void PrintValue(int par_nNumber)
 {
 	printf("Number:%d\n", par_nNumber);
+}
+
+void PrintValue(bool par_bNumber)
+{
+	printf("Bool:%s\n", par_bNumber?"true":"false");
+}
+
+void PrintValue()
+{
+	printf("No argument there..\n");
+}
+
+int PrintValue(int par_nNumber, char* par_cpString)
+{
+	printf("Number:%d, String:%s\n", par_nNumber,  par_cpString);
+	return par_nNumber;
 }
 
 void BoolAndInteger(bool par_bTest, int par_nTest)

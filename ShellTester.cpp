@@ -6,7 +6,7 @@ int main(int argc, char** argv)
 {
 	char cpBuffer[2000];
 	int nStatus = 0;
-	CInterpreter::bSilentMode = true;
+	CInterpreter::bSilentMode = false;
 
 	while(true)
 	{
@@ -25,7 +25,7 @@ int main(int argc, char** argv)
 					printf("Unknown Symbol, Call Failed\n");
 					break;
 				case 2:	
-					printf("Function has multiple alternatives\n");
+					//printf("Function has multiple alternatives\n");
 					break;
 			}
 			

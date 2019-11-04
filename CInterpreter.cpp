@@ -25,44 +25,45 @@ void* CInterpreter::getFuncAddressByName(char* par_cpFuncName, int* par_npStatus
 	}
 
 	char cpCommand[MAX_FUNCNAME_LENGTH + 50];
-	sprintf(cpCommand, "nm %s -C| grep [:+[:space:]]%s\\(", cpProgramName, par_cpFuncName);
-	
+	if(strchr(par_cpFuncName, '(') == NULL) //If there is no '(', function name does not need argument type matching
+		sprintf(cpCommand, "nm %s -C| grep [:+[:space:]]%s\\(", cpProgramName, par_cpFuncName); //func name is preceeded by a space or ':'
+	else
+		sprintf(cpCommand, "nm %s -C| grep -F \'%s\'", cpProgramName, par_cpFuncName); //func name is preceeded by a space of ':'
+		//sprintf(cpCommand, "nm %s -C| grep -F \'[:+[:space:]]%s\'", cpProgramName, par_cpFuncName); //func name is preceeded by a space of ':'
+
 	char cpOutputBuffer[MAX_SHELL_LINE_LENGTH];
 	bool bSingleAlternative = false;
 	long long int llnFuncAddress = 0;
-	while(true)
-	{
-		int nRetVal = ShellIO_Line(cpCommand, cpOutputBuffer, MAX_SHELL_LINE_LENGTH);
-		if(nRetVal < 0)
-			break;	//nRetVal < 0 means error in shellIO
-		char* cpOpenParen = strchr(cpOutputBuffer, '(');
-		if(cpOpenParen == NULL)
-			if(nRetVal == 0)
-				break;
-			else
-				continue;	//line does not include a function
-		int nFuncNameLength = strlen(par_cpFuncName);
-		if(cpOpenParen - cpOutputBuffer >= nFuncNameLength)
-		{
-			cpOpenParen -= nFuncNameLength;
-			if(strstr(cpOpenParen, par_cpFuncName) == cpOpenParen)
-			{
-				if(!bSingleAlternative)
-				{
-					sscanf(cpOutputBuffer, "%llx", &llnFuncAddress);
-					bSingleAlternative = true;
-				}
-				else
-				{
-					if(par_npStatus != NULL)
-						*par_npStatus = 2;
-					break;	//there are more than one alternatives
-				}
-			}
+	
+	//printf("%s\n", cpCommand);
+	int nRetVal = ShellIO_Line(cpCommand, cpOutputBuffer, MAX_SHELL_LINE_LENGTH);
+	//printf("ShellIO_Line output:%s, retval:%d\n", cpOutputBuffer, nRetVal); //temptemptmep, I am here for debuging!
+	if(nRetVal > 0){
+		if(par_npStatus != NULL)
+			*par_npStatus = 2;
+		if(!CInterpreter::bSilentMode){
+			printf("Function has multiple alternatives:\n");
+			do{	//print said alternatives
+				printf("%s\n", strstr(cpOutputBuffer, par_cpFuncName));
+				if(nRetVal == 0)
+					break;
+				nRetVal = ShellIO_Line(cpCommand, cpOutputBuffer, MAX_SHELL_LINE_LENGTH);
+				
+			}while(true);
 		}
-		if(nRetVal == 0)
-			break;
+		return NULL;
 	}
+	if(nRetVal < 0){
+		if(par_npStatus != NULL){
+			*par_npStatus = 1;
+		}
+		return 0;
+	}
+	
+	sscanf(cpOutputBuffer, "%llx", &llnFuncAddress);
+		
+		
+	
 	if(par_npStatus != NULL)
 		if(*par_npStatus != 2)
 			if(llnFuncAddress == 0)
@@ -112,7 +113,7 @@ int CInterpreter::ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nM
 		if(filepShell == NULL)
 		{
 			printf("CInterpreter::ShellIO:Error running shell cmd\n");
-			return -1;
+			return -2;
 		}
 		bIsStreamOpen = true;
 	}
@@ -123,10 +124,11 @@ int CInterpreter::ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nM
 		char cRead = getc(filepShell);
 		if(cRead == EOF)
 		{
-			//printf("EOF\n");
 			par_cpOutput[nCharCount] = 0;
 			pclose(filepShell);
 			bIsStreamOpen = false;
+			if(nCharCount == 0)
+				return -1;
 			return 0;	//return 0 if no more lines
 		}
 		if(cRead == '\n')	//if end of line
@@ -135,12 +137,10 @@ int CInterpreter::ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nM
 			cRead = getc(filepShell);	//check if next char is EOF
 			if(cRead == EOF)
 			{
-				//printf("EOFFF\n");
 				pclose(filepShell);
 				bIsStreamOpen = false;
 				return 0;	//return 0 if no more lines
 			}
-			//printf("EOL\n");
 			fseek(filepShell, -1, SEEK_CUR);	//if next char is not EOF, rewind the stream by one char
 			return 1;	//return 1 if there are more lines
 		}
@@ -226,10 +226,11 @@ bool CInterpreter::ParseFuncName(char** par_cppShellCommand, char* par_cpFuncNam
 {
 	char* cpParseIndex = *par_cppShellCommand;
 	char* cpCopyIndex = par_cpFuncName;
+	bool bArgumentTypeActive = false;
 	while(true)
 	{
-		if(*cpParseIndex == '(' || *cpParseIndex == ' ' || *cpParseIndex == 0)
-		{
+		if(*cpParseIndex == '(' || (*cpParseIndex == ' ' && !bArgumentTypeActive) || *cpParseIndex == 0)
+		{	//' ' is ok if an argument type is being read
 			*cpCopyIndex = 0; 	//terminate the string
 			*par_cppShellCommand = cpParseIndex;
 			return true;
@@ -240,6 +241,18 @@ bool CInterpreter::ParseFuncName(char** par_cppShellCommand, char* par_cpFuncNam
 				|| (*cpParseIndex == '_') || (*cpParseIndex == ':'))	//if alphanumeric or underscore or scope 
 		{
 			*cpCopyIndex++ = *cpParseIndex++;	//copy and move indices
+		}
+		else if((*cpParseIndex == '*' || *cpParseIndex == ' ' || *cpParseIndex == ',') && bArgumentTypeActive)
+			*cpCopyIndex++ = *cpParseIndex++;	//copy and move indices. For argument type ' ', ',' and '*' are ok
+		else if(*cpParseIndex == '<' && !bArgumentTypeActive){
+			bArgumentTypeActive = true;
+			*cpCopyIndex++ = '(';	//replace '<' with '(' and move indices. This is used to pass input types with function name
+			*cpParseIndex++;		//in cases with multiple alternative
+		}
+		else if(*cpParseIndex == '>' && bArgumentTypeActive){
+			bArgumentTypeActive = false;
+			*cpCopyIndex++ = ')';	//same with the above case
+			*cpParseIndex++;		
 		}
 		else
 		{
@@ -345,6 +358,7 @@ long long int CInterpreter::CallFunctionWithArgs(char* par_cpInput, int* par_npS
 	}
 
 	void* vpFunctionAddress = getFuncAddressByName(cpFunctionName, par_npStatus);
+	ShellIO_Line(NULL, NULL, -1);	//close and reset ShellIO
 	if(vpFunctionAddress == NULL)
 		return 0;
 
