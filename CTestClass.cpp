@@ -7,6 +7,11 @@ void CTestClass::HiddenFunction()
 	printf("You Have Found Me!\n");
 }
 
+int CTestClass::getNumber(int par_nNumber){
+	printf("Number:%d\n", par_nNumber);
+	return par_nNumber;
+}
+
 void HiddenFunction(){
 	printf("You Have Found Me Out Of Scope!\n");
 }

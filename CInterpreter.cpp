@@ -313,8 +313,11 @@ long long int CInterpreter::CallFunctionWithArgs(char* par_cpInput, int* par_npS
 
 	void* vpFunctionAddress = getFuncAddressByName(cpFunctionName, par_npStatus);
 	ShellIO_Line(NULL, NULL, -1);	//close and reset ShellIO
-	if(vpFunctionAddress == NULL)
+	if(vpFunctionAddress == NULL){
+		if(!bSilentMode)
+			printf("Unknown Symbol, Call Failed\n");
 		return 0;
+	}
 
 	long long int(*funcpFunctionToCall)(...);	//declare a func pointer taking a variable num of inputs and returning a long long int
 	funcpFunctionToCall = (long long int(*)(...))vpFunctionAddress;	//cast the function address into its type

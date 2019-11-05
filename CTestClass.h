@@ -2,6 +2,6 @@
 class CTestClass
 {
 public:
-	void HiddenFunction();
-	
+	static void HiddenFunction();
+	static int getNumber(int);
 };

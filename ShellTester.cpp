@@ -16,19 +16,6 @@ int main(int argc, char** argv)
 		if(*cpBuffer != 0)	//if user input is not empty
 		{
 			long long int llnRetVal = CInterpreter::getInstance()->CallFunctionWithArgs(cpBuffer, &nStatus);
-			switch(nStatus)
-			{
-				case 0:
-					//printf("Call Returned:%lld\n", llnRetVal);
-					break;
-				case 1:
-					printf("Unknown Symbol, Call Failed\n");
-					break;
-				case 2:	
-					//printf("Function has multiple alternatives\n");
-					break;
-			}
-			
 		}
 	}
 }
