@@ -6,97 +6,46 @@
 #include <string.h>
 
 #define MAX_ARG_COUNT 10	//maximum number of args shell command can have
-#define MAX_PROGNAME_LENGTH 100 	//max length of the executable's name
 #define MAX_FUNCNAME_LENGTH 100		//max length of function name
 #define MAX_SHELL_LINE_LENGTH 500	//used by getFuncAddressByName
 #define MAX_STRINGARG_LENGTH 1000	//max length of all string arguments combined
 
 
-bool CInterpreter::bSilentMode = false;
+CInterpreter* CInterpreter::getInstance(){
+	//MUTEX->LOCK
+	static CInterpreter* theInstance = new CInterpreter();
+	return theInstance;
+	//MUTEX->UNLOCK	//this function should be guarded in case of calls from multiple threads  
+}
+
+CInterpreter::CInterpreter(){
+	bSilentMode = false;
+	bool bIsStreamOpen = false;
+	FILE* filepShell = 0;
+	getProgramName(cpProgramName);
+
+	RegisterFunction("printf", (void*)printf); //added these 3 funcs
+	RegisterFunction("malloc", (void*)malloc); //they are located on shared libs
+	RegisterFunction("free", (void*)free);	   //therefore won't appear within the executable	
+}
 
 void* CInterpreter::getFuncAddressByName(char* par_cpFuncName, int* par_npStatus)
 {
-	static char cpProgramName[MAX_PROGNAME_LENGTH];
-	static bool bFirstRun = true;
-	if(bFirstRun)
-	{
-		getProgramName(cpProgramName);
-		bFirstRun = false;
+	void* vpRegisteredFunc = SearchRegisteredFunction(par_cpFuncName);
+	if(vpRegisteredFunc != NULL){
+		if(par_npStatus)
+			*par_npStatus = 0;
+		return vpRegisteredFunc;
 	}
 
-	char cpCommand[MAX_FUNCNAME_LENGTH + 50];
-	if(strchr(par_cpFuncName, '(') == NULL) //If there is no '(', function name does not need argument type matching
-		sprintf(cpCommand, "nm %s -C| grep [:+[:space:]]%s\\(", cpProgramName, par_cpFuncName); //func name is preceeded by a space or ':'
-	else
-		sprintf(cpCommand, "nm %s -C| grep -F \'%s\'", cpProgramName, par_cpFuncName); //func name is preceeded by a space of ':'
-		//sprintf(cpCommand, "nm %s -C| grep -F \'[:+[:space:]]%s\'", cpProgramName, par_cpFuncName); //func name is preceeded by a space of ':'
+	void* vpInternalFunc = SearchExecutableForFunction(par_cpFuncName, par_npStatus);
+	return vpInternalFunc;
 
-	char cpOutputBuffer[MAX_SHELL_LINE_LENGTH];
-	bool bSingleAlternative = false;
-	long long int llnFuncAddress = 0;
-	
-	//printf("%s\n", cpCommand);
-	int nRetVal = ShellIO_Line(cpCommand, cpOutputBuffer, MAX_SHELL_LINE_LENGTH);
-	//printf("ShellIO_Line output:%s, retval:%d\n", cpOutputBuffer, nRetVal); //temptemptmep, I am here for debuging!
-	if(nRetVal > 0){
-		if(par_npStatus != NULL)
-			*par_npStatus = 2;
-		if(!CInterpreter::bSilentMode){
-			printf("Function has multiple alternatives:\n");
-			do{	//print said alternatives
-				printf("%s\n", strstr(cpOutputBuffer, par_cpFuncName));
-				if(nRetVal == 0)
-					break;
-				nRetVal = ShellIO_Line(cpCommand, cpOutputBuffer, MAX_SHELL_LINE_LENGTH);
-				
-			}while(true);
-		}
-		return NULL;
-	}
-	if(nRetVal < 0){
-		if(par_npStatus != NULL){
-			*par_npStatus = 1;
-		}
-		return 0;
-	}
-	
-	sscanf(cpOutputBuffer, "%llx", &llnFuncAddress);
-		
-		
-	
-	if(par_npStatus != NULL)
-		if(*par_npStatus != 2)
-			if(llnFuncAddress == 0)
-				*par_npStatus = 1;
-			else
-				*par_npStatus = 0;
-	ShellIO_Line(NULL, NULL, -1);	//close and reset ShellIO
-	//printf("Function %s is at 0x%llx\n", par_cpFuncName, llnFuncAddress);
-	return (void*)llnFuncAddress;
-}
-
-int CInterpreter::ShellIO(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength)
-{
-	FILE* filepShell = 0;
-
-	filepShell = popen(par_cpInput, "r");
-	if(filepShell == NULL)
-	{
-		printf("CInterpreter::ShellIO:Error running shell cmd\n");
-		return -1;
-	}
-	int nRetVal = fread(par_cpOutput, 1, par_nMaxOutputLength -1 , filepShell);
-	par_cpOutput[nRetVal] = 0;	//add null terminator
-	printf("Shell Output:%s\n", par_cpOutput);
-
-	pclose(filepShell);
-	return nRetVal;
 }
 
 int CInterpreter::ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength)
 {
-	static bool bIsStreamOpen = false;
-	static FILE* filepShell = 0;
+
 	if(par_nMaxOutputLength < 1)	//close signal
 	{
 		if(bIsStreamOpen)
@@ -150,20 +99,25 @@ int CInterpreter::ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nM
 
 bool CInterpreter::getProgramName(char* par_cpProgramName)
 {
-	char cpPath[PATH_MAX];
-	if(readlink("/proc/self/exe", cpPath, PATH_MAX) < 0)
-	{
-		printf("CInterpreter::getProgramName:Can not get the program name!\n");
-		par_cpProgramName = NULL;
-		return false;
-	}
-	char* cpName = strrchr(cpPath, '/') + 1;	//last '/' + 1 points to program name
-	if(strcpy(par_cpProgramName, cpName) == NULL)
-	{
-		printf("CInterpreter::getProgramName:Can not get the program name!\n");
-		return false;
-	}
-	return true;
+	#if __linux__
+		char cpPath[PATH_MAX];
+		if(readlink("/proc/self/exe", cpPath, PATH_MAX) < 0)
+		{
+			printf("CInterpreter::getProgramName:Can not get the program name!\n");
+			par_cpProgramName = NULL;
+			return false;
+		}
+		char* cpName = strrchr(cpPath, '/') + 1;	//last '/' + 1 points to program name
+		if(strcpy(par_cpProgramName, cpName) == NULL)
+		{
+			printf("CInterpreter::getProgramName:Can not get the program name!\n");
+			return false;
+		}
+		return true;
+	#else
+		return false;	//Parsing the symbols within the executable is not implemented for 
+						//other platforms yet
+	#endif
 }
 
 int CInterpreter::ParseShellCommand(char* par_cpShellCommand, char* par_cpFuncName, char* par_cpStringLiteralArgs, long long int* par_llnpNumericArgs, teArgumentType* par_epArgTypes)
@@ -462,6 +416,76 @@ long long int CInterpreter::CallFunctionWithArgs(char* par_cpInput, int* par_npS
 	}
  
 	if(!CInterpreter::bSilentMode)
-		printf("Returned:%lld\n", llnRetVal);
+		printf("Call Returned:%lld\n", llnRetVal);
 	return llnRetVal;
+}
+
+void CInterpreter::RegisterFunction(const char* par_cpFuncName, void* par_vpFuncAddress){
+	trieRegisteredFunctions[par_cpFuncName] = par_vpFuncAddress;
+}
+
+void* CInterpreter::SearchRegisteredFunction(const char* par_cpFuncName){
+	CSparseTrie<void*>* triepRetVal = trieRegisteredFunctions.Find(par_cpFuncName);	//returns null
+	if(triepRetVal == NULL)
+		return NULL;
+
+	return *(triepRetVal->pTData);
+}
+
+int CInterpreter::lkup(){
+	printf("CInterpreter::Registered Functions:\n");
+	getInstance()->trieRegisteredFunctions.PrintKeys();
+	return getInstance()->trieRegisteredFunctions.Size();
+}
+
+void* CInterpreter::SearchExecutableForFunction(const char* par_cpFuncName, int* par_npStatus){
+	char cpCommand[MAX_FUNCNAME_LENGTH + 50];
+	if(strchr(par_cpFuncName, '(') == NULL) //If there is no '(', function name does not need argument type matching
+		sprintf(cpCommand, "nm %s -C| grep [:+[:space:]]%s\\(", cpProgramName, par_cpFuncName); //func name is preceeded by a space or ':'
+	else
+		sprintf(cpCommand, "nm %s -C| grep -F \'%s\'", cpProgramName, par_cpFuncName); //func name is preceeded by a space of ':'
+		//sprintf(cpCommand, "nm %s -C| grep -F \'[:+[:space:]]%s\'", cpProgramName, par_cpFuncName); //func name is preceeded by a space of ':'
+
+	char cpOutputBuffer[MAX_SHELL_LINE_LENGTH];
+	bool bSingleAlternative = false;
+	long long int llnFuncAddress = 0;
+	
+	//printf("%s\n", cpCommand);
+	int nRetVal = ShellIO_Line(cpCommand, cpOutputBuffer, MAX_SHELL_LINE_LENGTH);
+	//printf("ShellIO_Line output:%s, retval:%d\n", cpOutputBuffer, nRetVal); //temptemptmep, I am here for debuging!
+	if(nRetVal > 0){
+		if(par_npStatus != NULL)
+			*par_npStatus = 2;
+		if(!CInterpreter::bSilentMode){
+			printf("Function has multiple alternatives:\n");
+			do{	//print said alternatives
+				printf("%s\n", strstr(cpOutputBuffer, par_cpFuncName));
+				if(nRetVal == 0)
+					break;
+				nRetVal = ShellIO_Line(cpCommand, cpOutputBuffer, MAX_SHELL_LINE_LENGTH);
+				
+			}while(true);
+		}
+		return NULL;
+	}
+	if(nRetVal < 0){
+		if(par_npStatus != NULL){
+			*par_npStatus = 1;
+		}
+		return 0;
+	}
+	
+	sscanf(cpOutputBuffer, "%llx", &llnFuncAddress);
+		
+		
+	
+	if(par_npStatus != NULL)
+		if(*par_npStatus != 2)
+			if(llnFuncAddress == 0)
+				*par_npStatus = 1;
+			else
+				*par_npStatus = 0;
+	ShellIO_Line(NULL, NULL, -1);	//close and reset ShellIO
+	//printf("Function %s is at 0x%llx\n", par_cpFuncName, llnFuncAddress);
+	return (void*)llnFuncAddress;	
 }
