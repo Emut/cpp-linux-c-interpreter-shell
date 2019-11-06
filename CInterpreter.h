@@ -42,14 +42,16 @@ private:		//To be changed to private after class is completed!
 	enum teArgumentType
 	{
 		ARG_NUMBER = 0,
-		ARG_STRING = 1
+		ARG_STRING = 1,
+		ARG_VARIABLE = 2
 	};
 	void* getFuncAddressByName(char* par_cpFuncName, int* par_npStatus = 0); 
 	int ShellIO(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength);	//not used atm
 	int ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength);
 	bool getProgramName(char* par_cpProgramName);
-	int ParseShellCommand(char* par_cpShellCommand, char* par_cpFuncName, char* par_cpStringLiteralArgs, long long int* par_llnpNumaricArgs, teArgumentType* par_epArgTypes);
+	int ParseShellCommand(char* par_cpShellCommand, char* par_cpFuncName, char* par_cpStringLiteralArgs, long long int* par_llnpNumaricArgs, teArgumentType* par_epArgTypes, char* par_cpReturnVarName);
 	bool ParseFuncName(char** par_cppShellCommand, char* par_cpFuncName);
+	bool ParseVarName(char** par_cppShellCommand, char* par_cpVarName);
 	bool ParseStringArgument(char** par_cppShellCommand, char* par_cpStringLiteralArgs, int* par_npStringBufferOffset);
 	bool ParseNumericArgument(char** par_cppShellCommand, long long int* par_llnpResult);
 	
@@ -57,10 +59,12 @@ private:		//To be changed to private after class is completed!
 
 	char cpProgramName[MAX_PROGNAME_LENGTH];
 	CSparseTrie<void*> trieRegisteredFunctions;
+	CSparseTrie<long long int> trieVariables;
 	bool bIsStreamOpen;
 	FILE* filepShell;
 
 	static int lkup(); 
+	static int PrintVariables();
 
 	CInterpreter();	//go singleton
 };

@@ -1,9 +1,12 @@
 #include "CInterpreter.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <limits.h>
 #include <string.h>
+
+#ifdef __linux__
+	#include <unistd.h>
+#endif
 
 #define MAX_ARG_COUNT 10	//maximum number of args shell command can have
 #define MAX_FUNCNAME_LENGTH 100		//max length of function name
@@ -12,10 +15,8 @@
 
 
 CInterpreter* CInterpreter::getInstance(){
-	//MUTEX->LOCK
 	static CInterpreter* theInstance = new CInterpreter();
-	return theInstance;
-	//MUTEX->UNLOCK	//this function should be guarded in case of calls from multiple threads  
+	return theInstance;  
 }
 
 CInterpreter::CInterpreter(){
@@ -27,6 +28,10 @@ CInterpreter::CInterpreter(){
 	RegisterFunction("printf", (void*)printf); //added these 3 funcs
 	RegisterFunction("malloc", (void*)malloc); //they are located on shared libs
 	RegisterFunction("free", (void*)free);	   //therefore won't appear within the executable	
+	RegisterFunction("lkup", (void*)lkup);
+	RegisterFunction("PrintVariables", (void*)PrintVariables);
+	
+	trieVariables["umut"] = 1818;
 }
 
 void* CInterpreter::getFuncAddressByName(char* par_cpFuncName, int* par_npStatus)
@@ -45,7 +50,7 @@ void* CInterpreter::getFuncAddressByName(char* par_cpFuncName, int* par_npStatus
 
 int CInterpreter::ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength)
 {
-
+	#if __linux__
 	if(par_nMaxOutputLength < 1)	//close signal
 	{
 		if(bIsStreamOpen)
@@ -95,6 +100,9 @@ int CInterpreter::ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nM
 		}
 		par_cpOutput[nCharCount++] = cRead;
 	}
+	#else
+		return -2;
+	#endif
 }
 
 bool CInterpreter::getProgramName(char* par_cpProgramName)
@@ -120,11 +128,25 @@ bool CInterpreter::getProgramName(char* par_cpProgramName)
 	#endif
 }
 
-int CInterpreter::ParseShellCommand(char* par_cpShellCommand, char* par_cpFuncName, char* par_cpStringLiteralArgs, long long int* par_llnpNumericArgs, teArgumentType* par_epArgTypes)
+int CInterpreter::ParseShellCommand(char* par_cpShellCommand, char* par_cpFuncName, char* par_cpStringLiteralArgs, long long int* par_llnpNumericArgs, teArgumentType* par_epArgTypes, char* par_cpReturnVarName)
 {
 	char* cpParseIndex = par_cpShellCommand;
 	int nStringArgBufferOffset = 0;
 	par_cpStringLiteralArgs[0] = 0;
+	while(*cpParseIndex != 0){
+		if(*cpParseIndex != ' ')
+			break;	//eat starting whitespace
+		++cpParseIndex ;
+	}
+	if(cpParseIndex[0] == '$'){
+		++cpParseIndex;
+		ParseVarName(&cpParseIndex, par_cpReturnVarName);
+		while(*cpParseIndex != 0){
+			if(!(*cpParseIndex == ' ' || *cpParseIndex == '='))
+				break;	//eat whitespace and '=' between varname and funcname
+			++cpParseIndex ;
+		}
+	}
 	if(!ParseFuncName(&cpParseIndex, par_cpFuncName))
 		return -1;
 	bool bIsFuncParenWrapped = false;
@@ -181,6 +203,8 @@ bool CInterpreter::ParseFuncName(char** par_cppShellCommand, char* par_cpFuncNam
 	char* cpParseIndex = *par_cppShellCommand;
 	char* cpCopyIndex = par_cpFuncName;
 	bool bArgumentTypeActive = false;
+	if(*cpParseIndex == 0)
+		return false;	//it is a 0 len string, not a func name
 	while(true)
 	{
 		if(*cpParseIndex == '(' || (*cpParseIndex == ' ' && !bArgumentTypeActive) || *cpParseIndex == 0)
@@ -210,10 +234,38 @@ bool CInterpreter::ParseFuncName(char** par_cppShellCommand, char* par_cpFuncNam
 		}
 		else
 		{
-			printf("CInterpreter::ParseFuncName:Unexpecdted char value\n %d", *cpParseIndex);
+			printf("CInterpreter::ParseFuncName:Unexpecdted char value %d:%c\n", *cpParseIndex, *cpParseIndex);
 			return false;
 		}
 	}
+}
+
+bool CInterpreter::ParseVarName(char** par_cppShellCommand, char* par_cpVarName){
+	char* cpParseIndex = *par_cppShellCommand;
+	char* cpCopyIndex = par_cpVarName;
+	while(true)
+	{
+		if(*cpParseIndex == '=' || *cpParseIndex == ' ' || *cpParseIndex == 0)
+		{
+			*cpCopyIndex = 0; 	//terminate the string
+			*par_cppShellCommand = cpParseIndex;
+			return true;
+		}
+		else if((*cpParseIndex >= '0' && *cpParseIndex <= '9')
+				|| (*cpParseIndex >= 'A' && *cpParseIndex <= 'Z')
+				|| (*cpParseIndex >= 'a' && *cpParseIndex <= 'z')
+				|| (*cpParseIndex == '_') || (*cpParseIndex == ':'))	//if alphanumeric or underscore or scope 
+		{
+			*cpCopyIndex++ = *cpParseIndex++;	//copy and move indices
+		}
+		
+		else
+		{
+			printf("CInterpreter::ParseFuncName:Unexpecdted char value %d:%c\n", *cpParseIndex, *cpParseIndex);
+			return false;
+		}
+	}
+
 }
 
 bool CInterpreter::ParseStringArgument(char** par_cppShellCommand, char* par_cpStringLiteralArgs, int* par_npStringBufferOffset)
@@ -264,12 +316,22 @@ long long int CInterpreter::CallFunctionWithArgs(char* par_cpInput, int* par_npS
 	if(par_cpInput == NULL || *par_cpInput == 0)
 		return 0;
 	char cpFunctionName[MAX_FUNCNAME_LENGTH];
+	char cpRetValName[MAX_FUNCNAME_LENGTH];
+	cpFunctionName[0] = 0; //make it a zero length string.
+	cpRetValName[0] = 0; //So if parsing is invalid, result will be a 0 len string.
 	char cpStringLiterals[MAX_STRINGARG_LENGTH];
 	long long int llnpNumericArgs[MAX_ARG_COUNT];
 	teArgumentType epArgumentTypes[MAX_ARG_COUNT];
 
-	int nNumberOfArgs = ParseShellCommand(par_cpInput, cpFunctionName, cpStringLiterals, llnpNumericArgs, epArgumentTypes);
-
+	int nNumberOfArgs = ParseShellCommand(par_cpInput, cpFunctionName, cpStringLiterals, llnpNumericArgs, epArgumentTypes, cpRetValName);
+	printf("f:%s, v:%s\n", cpFunctionName, cpRetValName);
+	
+	if(nNumberOfArgs == -1 && cpRetValName[0] != 0){
+		printf("%s:%lld\n", cpRetValName, trieVariables[cpRetValName]);
+		if(par_npStatus)
+			*par_npStatus = 3;
+		return 0;
+	}
 	char* cpPrintIndex = cpStringLiterals;
 
 	#if ENABLE_DEBUG_PRINTS
@@ -420,6 +482,8 @@ long long int CInterpreter::CallFunctionWithArgs(char* par_cpInput, int* par_npS
  
 	if(!CInterpreter::bSilentMode)
 		printf("Call Returned:%lld\n", llnRetVal);
+	if(cpRetValName[0] != 0)	//if a variable to hold retval is provided
+		trieVariables[cpRetValName] = llnRetVal;
 	return llnRetVal;
 }
 
@@ -439,6 +503,17 @@ int CInterpreter::lkup(){
 	printf("CInterpreter::Registered Functions:\n");
 	getInstance()->trieRegisteredFunctions.PrintKeys();
 	return getInstance()->trieRegisteredFunctions.Size();
+}
+
+int CInterpreter::PrintVariables(){
+	printf("CInterpreter::Registered Variables:\n");
+	char cpVarName[CSPARSETRIE_MAX_KEY_LEN + 1];
+	long long int* llnpVar = 0;
+	for(int i = 0; i < getInstance()->trieVariables.Size(); ++i){
+		getInstance()->trieVariables.getElm(i, cpVarName, llnpVar);
+		printf("%s:%lld\n", cpVarName, *llnpVar);
+	}
+	return getInstance()->trieVariables.Size();
 }
 
 void* CInterpreter::SearchExecutableForFunction(const char* par_cpFuncName, int* par_npStatus){
