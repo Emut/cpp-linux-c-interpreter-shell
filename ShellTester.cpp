@@ -5,7 +5,7 @@
 int main(int argc, char** argv)
 {
 	char cpBuffer[2000];
-	int nStatus = 0;
+	CInterpreter::teCallReturn eStatus = CInterpreter::CALL_OK;
 	CInterpreter::getInstance()->bSilentMode = false;
 
 	while(true)
@@ -15,7 +15,7 @@ int main(int argc, char** argv)
 		*strchr(cpBuffer, '\n') = 0;	//remove the newline at the end.
 		if(*cpBuffer != 0)	//if user input is not empty
 		{
-			long long int llnRetVal = CInterpreter::getInstance()->CallFunctionWithArgs(cpBuffer, &nStatus);
+			long long int llnRetVal = CInterpreter::getInstance()->CallFunctionWithArgs(cpBuffer, &eStatus);
 		}
 	}
 }

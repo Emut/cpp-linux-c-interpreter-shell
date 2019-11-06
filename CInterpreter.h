@@ -27,17 +27,36 @@
 class CInterpreter
 {
 
+
 public:
 	static CInterpreter* getInstance();
 
-	long long int CallFunctionWithArgs(char* par_cpInput, int* par_npStatus = 0);
+	enum teCallReturn
+	{
+		CALL_OK,
+		CALL_FAILED_UNKNOWN_SYM,
+		CALL_FAILED_MULTIPLE_SYM,
+		CALL_FOR_VARIABLE
+	};
+
+	long long int CallFunctionWithArgs(char* par_cpInput, teCallReturn* par_epStatus = 0);
+	//calls function. ex: "myFunction("A String Argument", 123)"
+
 	void RegisterFunction(const char* par_cpFuncName, void* par_vpFuncAddress);
+	//register own functions or functions from loaded libs 
+
 	void* SearchRegisteredFunction(const char* par_cpFuncName);
-	void* SearchExecutableForFunction(const char* par_cpFuncName, int* par_npStatus);
+	//get function address from list of registered functions
+
+	void* SearchExecutableForFunction(const char* par_cpFuncName, teCallReturn* par_epStatus);
+	//get function address within the executable (version supports linux only. Requires nm and grep.)
+
+	long long int getVariableValue(const char* par_cpVariableName);
+	//get the value of created interpreter variables
 
 	bool bSilentMode;	//If false, return value of the function call is outputted at the terminal.
 
-private:		//To be changed to private after class is completed!
+private:		
 
 	enum teArgumentType
 	{
@@ -45,7 +64,8 @@ private:		//To be changed to private after class is completed!
 		ARG_STRING = 1,
 		ARG_VARIABLE = 2
 	};
-	void* getFuncAddressByName(char* par_cpFuncName, int* par_npStatus = 0); 
+
+	void* getFuncAddressByName(char* par_cpFuncName, teCallReturn* par_eStatus = NULL); 
 	int ShellIO(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength);	//not used atm
 	int ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength);
 	bool getProgramName(char* par_cpProgramName);

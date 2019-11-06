@@ -30,26 +30,31 @@ CInterpreter::CInterpreter(){
 	RegisterFunction("free", (void*)free);	   //therefore won't appear within the executable	
 	RegisterFunction("lkup", (void*)lkup);
 	RegisterFunction("PrintVariables", (void*)PrintVariables);
-	
-	trieVariables["umut"] = 1818;
 }
 
-void* CInterpreter::getFuncAddressByName(char* par_cpFuncName, int* par_npStatus)
+void* CInterpreter::getFuncAddressByName(char* par_cpFuncName, teCallReturn* par_epStatus)
 {
+	//return the address of function named par_cpFuncName
+	//if function exists in the list of registered functions, return that one
+	//else check the executable for given function
 	void* vpRegisteredFunc = SearchRegisteredFunction(par_cpFuncName);
 	if(vpRegisteredFunc != NULL){
-		if(par_npStatus)
-			*par_npStatus = 0;
+		if(par_epStatus)
+			*par_epStatus = CALL_OK;
 		return vpRegisteredFunc;
 	}
 
-	void* vpInternalFunc = SearchExecutableForFunction(par_cpFuncName, par_npStatus);
+	void* vpInternalFunc = SearchExecutableForFunction(par_cpFuncName, par_epStatus);
 	return vpInternalFunc;
 
 }
 
 int CInterpreter::ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength)
 {
+	//utility function to execute system cmd given with par_cpInput and return the cmd result
+	//line by line in succesive calls.
+	//to reset the call, send par_nMaxOutputLength<0.
+	//current version only supports system calls on linux systems
 	#if __linux__
 	if(par_nMaxOutputLength < 1)	//close signal
 	{
@@ -107,6 +112,7 @@ int CInterpreter::ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nM
 
 bool CInterpreter::getProgramName(char* par_cpProgramName)
 {
+	//write the name of the running executable to given char*
 	#if __linux__
 		char cpPath[PATH_MAX];
 		if(readlink("/proc/self/exe", cpPath, PATH_MAX) < 0)
@@ -130,6 +136,7 @@ bool CInterpreter::getProgramName(char* par_cpProgramName)
 
 int CInterpreter::ParseShellCommand(char* par_cpShellCommand, char* par_cpFuncName, char* par_cpStringLiteralArgs, long long int* par_llnpNumericArgs, teArgumentType* par_epArgTypes, char* par_cpReturnVarName)
 {
+	//take the command. parse it into function name, variables, numeric arguments and string arguments
 	char* cpParseIndex = par_cpShellCommand;
 	int nStringArgBufferOffset = 0;
 	par_cpStringLiteralArgs[0] = 0;
@@ -184,6 +191,16 @@ int CInterpreter::ParseShellCommand(char* par_cpShellCommand, char* par_cpFuncNa
 			nArgIndex++;
 			continue;
 		}
+		else if(*cpParseIndex == '$'){	//start of a variable
+			++cpParseIndex; //skip the '$'
+			char cpTempVarName[MAX_FUNCNAME_LENGTH];
+			cpTempVarName[0] = 0;
+			ParseVarName(&cpParseIndex, cpTempVarName);
+			*(par_llnpNumericArgs + nArgIndex) = trieVariables[cpTempVarName];
+			par_epArgTypes[nArgIndex] = ARG_NUMBER;
+			nArgIndex++;
+			continue;
+		}
 		else
 		{
 			if (*cpParseIndex == '(' && nArgIndex == 0)	//If still not seen first arg and open paren
@@ -198,8 +215,7 @@ int CInterpreter::ParseShellCommand(char* par_cpShellCommand, char* par_cpFuncNa
 	}
 }
 
-bool CInterpreter::ParseFuncName(char** par_cppShellCommand, char* par_cpFuncName)
-{
+bool CInterpreter::ParseFuncName(char** par_cppShellCommand, char* par_cpFuncName){
 	char* cpParseIndex = *par_cppShellCommand;
 	char* cpCopyIndex = par_cpFuncName;
 	bool bArgumentTypeActive = false;
@@ -245,7 +261,7 @@ bool CInterpreter::ParseVarName(char** par_cppShellCommand, char* par_cpVarName)
 	char* cpCopyIndex = par_cpVarName;
 	while(true)
 	{
-		if(*cpParseIndex == '=' || *cpParseIndex == ' ' || *cpParseIndex == 0)
+		if(/**cpParseIndex == '=' || *cpParseIndex == ' ' ||*/ *cpParseIndex == 0)
 		{
 			*cpCopyIndex = 0; 	//terminate the string
 			*par_cppShellCommand = cpParseIndex;
@@ -261,8 +277,10 @@ bool CInterpreter::ParseVarName(char** par_cppShellCommand, char* par_cpVarName)
 		
 		else
 		{
-			printf("CInterpreter::ParseFuncName:Unexpecdted char value %d:%c\n", *cpParseIndex, *cpParseIndex);
-			return false;
+			*cpCopyIndex = 0; 	//terminate the string
+			*par_cppShellCommand = cpParseIndex; 
+			//printf("CInterpreter::ParseVarName:Unexpecdted char value %d:%c\n", *cpParseIndex, *cpParseIndex);
+			return true;
 		}
 	}
 
@@ -311,8 +329,9 @@ bool CInterpreter::ParseNumericArgument(char** par_cppShellCommand, long long in
 	}
 }
 
-long long int CInterpreter::CallFunctionWithArgs(char* par_cpInput, int* par_npStatus)
+long long int CInterpreter::CallFunctionWithArgs(char* par_cpInput, teCallReturn* par_epStatus)
 {
+	//take user's command. have it parsed and call the function
 	if(par_cpInput == NULL || *par_cpInput == 0)
 		return 0;
 	char cpFunctionName[MAX_FUNCNAME_LENGTH];
@@ -324,12 +343,11 @@ long long int CInterpreter::CallFunctionWithArgs(char* par_cpInput, int* par_npS
 	teArgumentType epArgumentTypes[MAX_ARG_COUNT];
 
 	int nNumberOfArgs = ParseShellCommand(par_cpInput, cpFunctionName, cpStringLiterals, llnpNumericArgs, epArgumentTypes, cpRetValName);
-	printf("f:%s, v:%s\n", cpFunctionName, cpRetValName);
 	
-	if(nNumberOfArgs == -1 && cpRetValName[0] != 0){
+	if(nNumberOfArgs == -1 && cpRetValName[0] != 0){	//if is not a function call and there is a named variable, print the variable
 		printf("%s:%lld\n", cpRetValName, trieVariables[cpRetValName]);
-		if(par_npStatus)
-			*par_npStatus = 3;
+		if(par_epStatus)
+			*par_epStatus = CALL_FOR_VARIABLE;
 		return 0;
 	}
 	char* cpPrintIndex = cpStringLiterals;
@@ -373,7 +391,7 @@ long long int CInterpreter::CallFunctionWithArgs(char* par_cpInput, int* par_npS
 		}
 	}
 
-	void* vpFunctionAddress = getFuncAddressByName(cpFunctionName, par_npStatus);
+	void* vpFunctionAddress = getFuncAddressByName(cpFunctionName, par_epStatus);
 	ShellIO_Line(NULL, NULL, -1);	//close and reset ShellIO
 	if(vpFunctionAddress == NULL){
 		if(!bSilentMode)
@@ -500,12 +518,14 @@ void* CInterpreter::SearchRegisteredFunction(const char* par_cpFuncName){
 }
 
 int CInterpreter::lkup(){
+	//utility function to print all user registered functions
 	printf("CInterpreter::Registered Functions:\n");
 	getInstance()->trieRegisteredFunctions.PrintKeys();
 	return getInstance()->trieRegisteredFunctions.Size();
 }
 
 int CInterpreter::PrintVariables(){
+	//utility function to print all user variables
 	printf("CInterpreter::Registered Variables:\n");
 	char cpVarName[CSPARSETRIE_MAX_KEY_LEN + 1];
 	long long int* llnpVar = 0;
@@ -516,7 +536,12 @@ int CInterpreter::PrintVariables(){
 	return getInstance()->trieVariables.Size();
 }
 
-void* CInterpreter::SearchExecutableForFunction(const char* par_cpFuncName, int* par_npStatus){
+void* CInterpreter::SearchExecutableForFunction(const char* par_cpFuncName, teCallReturn* par_epStatus){
+	//search the function par_cpFuncName in the executable.
+	//currently only implemented for linux
+	//TODO: generic ELF parsing: would enable this functionality for any OS using ELF format
+	//TODO: COFF parsing: would enable functionality for Windows systems
+	#ifdef __linux__
 	char cpCommand[MAX_FUNCNAME_LENGTH + 50];
 	if(strchr(par_cpFuncName, '(') == NULL) //If there is no '(', function name does not need argument type matching
 		sprintf(cpCommand, "nm %s -C| grep [:+[:space:]]%s\\(", cpProgramName, par_cpFuncName); //func name is preceeded by a space or ':'
@@ -532,12 +557,17 @@ void* CInterpreter::SearchExecutableForFunction(const char* par_cpFuncName, int*
 	int nRetVal = ShellIO_Line(cpCommand, cpOutputBuffer, MAX_SHELL_LINE_LENGTH);
 	//printf("ShellIO_Line output:%s, retval:%d\n", cpOutputBuffer, nRetVal); //temptemptmep, I am here for debuging!
 	if(nRetVal > 0){
-		if(par_npStatus != NULL)
-			*par_npStatus = 2;
+		if(par_epStatus != NULL)
+			*par_epStatus = CALL_FAILED_MULTIPLE_SYM;
 		if(!CInterpreter::bSilentMode){
 			printf("Function has multiple alternatives:\n");
 			do{	//print said alternatives
-				printf("%s\n", strstr(cpOutputBuffer, par_cpFuncName));
+				char* cpFuncNameBegin = strstr(cpOutputBuffer, par_cpFuncName);	//char* points to begining of func name w/o scope
+				while(*cpFuncNameBegin != ' ')
+					--cpFuncNameBegin;	//go back until a ' '. Seems dangerous (no boundary checking), however this function is
+										//custom for linux and grep, a ' ' always appears before the complete symbol name
+				++cpFuncNameBegin;	//rewinded until ' ', now advance once.
+				printf("%s\n", cpFuncNameBegin);
 				if(nRetVal == 0)
 					break;
 				nRetVal = ShellIO_Line(cpCommand, cpOutputBuffer, MAX_SHELL_LINE_LENGTH);
@@ -547,8 +577,8 @@ void* CInterpreter::SearchExecutableForFunction(const char* par_cpFuncName, int*
 		return NULL;
 	}
 	if(nRetVal < 0){
-		if(par_npStatus != NULL){
-			*par_npStatus = 1;
+		if(par_epStatus != NULL){
+			*par_epStatus = CALL_FAILED_UNKNOWN_SYM;
 		}
 		return 0;
 	}
@@ -557,13 +587,18 @@ void* CInterpreter::SearchExecutableForFunction(const char* par_cpFuncName, int*
 		
 		
 	
-	if(par_npStatus != NULL)
-		if(*par_npStatus != 2)
-			if(llnFuncAddress == 0)
-				*par_npStatus = 1;
-			else
-				*par_npStatus = 0;
+	if(par_epStatus != NULL)
+		*par_epStatus = CALL_OK;
+
 	ShellIO_Line(NULL, NULL, -1);	//close and reset ShellIO
 	//printf("Function %s is at 0x%llx\n", par_cpFuncName, llnFuncAddress);
-	return (void*)llnFuncAddress;	
+	return (void*)llnFuncAddress;
+	#else
+		return NULL;
+	#endif	
+}
+
+long long int CInterpreter::getVariableValue(const char* par_cpVariableName){
+	long long int llnTemp = trieVariables[par_cpVariableName];
+	return llnTemp;
 }

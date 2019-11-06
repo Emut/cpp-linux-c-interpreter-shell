@@ -12,7 +12,7 @@ int CTestClass::getNumber(int par_nNumber){
 	return par_nNumber;
 }
 
-void HiddenFunction(){
+void CAnotherTestClass::HiddenFunction(){
 	printf("You Have Found Me Out Of Scope!\n");
 }
 
