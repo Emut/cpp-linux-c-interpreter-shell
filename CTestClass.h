@@ -10,4 +10,5 @@ class CAnotherTestClass
 {
 public:
 	static void HiddenFunction();
+	static void PrintMe();
 };

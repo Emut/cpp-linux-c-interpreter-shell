@@ -19,6 +19,8 @@
 * Class provides 2 additional functions SearchRegisteredFunction(..) and SearchExecutableForFunction(..)
 * These functions can be used for obtaining function address, which then can be used with a proper function pointer cast,
 * as in the case of dynamic loading.  
+*
+* Tested on Ubuntu 14.04, Ubuntu 16.04 g++ 5.4.0 and Visual Studio 2012 
 */
 
 #define MAX_PROGNAME_LENGTH 100 	//max length of the executable's name

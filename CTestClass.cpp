@@ -16,6 +16,10 @@ void CAnotherTestClass::HiddenFunction(){
 	printf("You Have Found Me Out Of Scope!\n");
 }
 
+void CAnotherTestClass::PrintMe(){
+	printf("So here you are\n");
+}
+
 int StringInputTester(char* par_cpString)
 {
 	printf("String input:%s\n", par_cpString);
