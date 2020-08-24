@@ -1,6 +1,6 @@
 
- CInterpreter
- Umut Ekici 2019
+ # CInterpreter
+ ## Umut Ekici 2019
 
  Inspired by the vxworks c interpreter shell. 
  Call functions and create variables via the interpreter.
@@ -24,86 +24,86 @@
 
 An example session with functions in CTestClass.cpp is below. Comments with // are added for clarity
 
-->
-->lkup	//built-in function to print all user registered functions
-CInterpreter::Registered Functions:
-PrintVariables
-free
-lkup
-malloc
-printf
-Call Returned:5
-->
-->printf("Hello World %d %c", 123, 10)	//call the printf with 3 arguments (3th arg is a newline)
-Hello World 123 
-Call Returned:17
-->
-->PrintMe //call the function AnotherTestClass::PrintMe() defined in CTestClass.cpp
-So here you are
-Call Returned:16
-->
-->CAnotherTestClass::PrintMe	//it is also possible to use with scope name
-So here you are
-Call Returned:16
-->
-->HiddenFunction	//this function is defined in 2 classes, listed below
-Function has multiple alternatives:
-CTestClass::HiddenFunction()
-CAnotherTestClass::HiddenFunction()
-Unknown Symbol, Call Failed
-->
-->CTestClass::HiddenFunction()	//include scope name to refer an indivdual function
-You Have Found Me!
-Call Returned:19
-->CAnotherTestClass::HiddenFunction()	//note that paren's are optional 
-You Have Found Me Out Of Scope!
-Call Returned:32
-->
-->PrintValue()	//An overloaded function. use <> template specifiers to access
-Function has multiple alternatives:
-PrintValue(bool)
-PrintValue(int)
-PrintValue(int, char*)
-PrintValue(int*)
-PrintValue()
-Unknown Symbol, Call Failed
-->
-->PrintValue<>()
-No argument there..
-Call Returned:20
-->
-->PrintValue<int>(123)
-Number:123
-Call Returned:11
-->
-->PrintValue<bool>(1)
-Bool:true
-Call Returned:10
-->
-->PrintValue<int, char*>(123, "A String Here")
-Number:123, String:A String Here
-Call Returned:123
-->
-->
-->$myVar	//define variables, they have to start with $
-myVar:0
-->
-->$anotherVar
-anotherVar:0
-->
-->$intPtr = getNewNumber(123)	//if not defined, vars will be defined upon usage
-Call Returned:8408304
-->
-->PrintVariables	//built-in function to print existing vars and values
-CInterpreter::Registered Variables:
-anotherVar:0
-intPtr:8408304
-myVar:0
-Call Returned:3
-->
-->PrintValue<int*>($intPtr)	//variables can be used as arguments in function calls
-Number:123
-Call Returned:11
+->\
+->lkup	//built-in function to print all user registered functions\
+CInterpreter::Registered Functions:\
+PrintVariables\
+free\
+lkup\
+malloc\
+printf\
+Call Returned:5\
+->\
+->printf("Hello World %d %c", 123, 10)	//call the printf with 3 arguments (3th arg is a newline)\
+Hello World 123 \
+Call Returned:17\
+->\
+->PrintMe //call the function AnotherTestClass::PrintMe() defined in CTestClass.cpp\
+So here you are\
+Call Returned:16\
+->\
+->CAnotherTestClass::PrintMe	//it is also possible to use with scope name\
+So here you are\
+Call Returned:16\
+->\
+->HiddenFunction	//this function is defined in 2 classes, listed below\
+Function has multiple alternatives:\
+CTestClass::HiddenFunction()\
+CAnotherTestClass::HiddenFunction()\
+Unknown Symbol, Call Failed\
+->\
+->CTestClass::HiddenFunction()	//include scope name to refer an indivdual function\
+You Have Found Me!\
+Call Returned:19\
+->CAnotherTestClass::HiddenFunction()	//note that paren's are optional \
+You Have Found Me Out Of Scope!\
+Call Returned:32\
+->\
+->PrintValue()	//An overloaded function. use <> template specifiers to access\
+Function has multiple alternatives:\
+PrintValue(bool)\
+PrintValue(int)\
+PrintValue(int, char*)\
+PrintValue(int*)\
+PrintValue()\
+Unknown Symbol, Call Failed\
+->\
+->PrintValue<>()\
+No argument there..\
+Call Returned:20\
+->\
+->PrintValue\<int\>(123)\
+Number:123\
+Call Returned:11\
+->\
+->PrintValue\<bool\>(1)\
+Bool:true\
+Call Returned:10\
+->\
+->PrintValue<int, char*>(123, "A String Here")\
+Number:123, String:A String Here\
+Call Returned:123\
+->\
+->\
+->$myVar	//define variables, they have to start with $\
+myVar:0\
+->\
+->$anotherVar\
+anotherVar:0\
+->\
+->$intPtr = getNewNumber(123)	//if not defined, vars will be defined upon usage\
+Call Returned:8408304\
+->\
+->PrintVariables	//built-in function to print existing vars and values\
+CInterpreter::Registered Variables:\
+anotherVar:0\
+intPtr:8408304\
+myVar:0\
+Call Returned:3\
+->\
+->PrintValue<int*>($intPtr)	//variables can be used as arguments in function calls\
+Number:123\
+Call Returned:11\
 ->
 
 
