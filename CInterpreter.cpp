@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <string.h>
+#include "CTestClass.h"
 
 #ifdef __linux__
 	#include <unistd.h>
@@ -30,9 +31,11 @@ CInterpreter::CInterpreter(){
 	RegisterFunction("free", (void*)free);	   //therefore won't appear within the executable	
 	RegisterFunction("lkup", (void*)lkup);
 	RegisterFunction("PrintVariables", (void*)PrintVariables);
+
+	offset = (unsigned long long)(CInterpreter::lkup) - (unsigned long long)getFuncAddressByName("CInterpreter::lkup",0);
 }
 
-void* CInterpreter::getFuncAddressByName(char* par_cpFuncName, teCallReturn* par_epStatus)
+void* CInterpreter::getFuncAddressByName(const char* par_cpFuncName, teCallReturn* par_epStatus)
 {
 	//return the address of function named par_cpFuncName
 	//if function exists in the list of registered functions, return that one
@@ -45,6 +48,9 @@ void* CInterpreter::getFuncAddressByName(char* par_cpFuncName, teCallReturn* par
 	}
 
 	void* vpInternalFunc = SearchExecutableForFunction(par_cpFuncName, par_epStatus);
+	if(vpInternalFunc == NULL)
+		return NULL;
+	vpInternalFunc = (void*)((unsigned long long)vpInternalFunc + offset);
 	return vpInternalFunc;
 
 }
@@ -213,6 +219,7 @@ int CInterpreter::ParseShellCommand(char* par_cpShellCommand, char* par_cpFuncNa
 			return -1;
 		}
 	}
+	return -1;
 }
 
 bool CInterpreter::ParseFuncName(char** par_cppShellCommand, char* par_cpFuncName){
@@ -582,10 +589,7 @@ void* CInterpreter::SearchExecutableForFunction(const char* par_cpFuncName, teCa
 		}
 		return 0;
 	}
-	
 	sscanf(cpOutputBuffer, "%llx", &llnFuncAddress);
-		
-		
 	
 	if(par_epStatus != NULL)
 		*par_epStatus = CALL_OK;

@@ -67,7 +67,7 @@ private:
 		ARG_VARIABLE = 2
 	};
 
-	void* getFuncAddressByName(char* par_cpFuncName, teCallReturn* par_eStatus = NULL); 
+	void* getFuncAddressByName(const char* par_cpFuncName, teCallReturn* par_eStatus = NULL); 
 	int ShellIO(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength);	//not used atm
 	int ShellIO_Line(char* par_cpInput, char* par_cpOutput, int par_nMaxOutputLength);
 	bool getProgramName(char* par_cpProgramName);
@@ -84,6 +84,7 @@ private:
 	CSparseTrie<long long int> trieVariables;
 	bool bIsStreamOpen;
 	FILE* filepShell;
+	unsigned long long offset;
 
 	static int lkup(); 
 	static int PrintVariables();
